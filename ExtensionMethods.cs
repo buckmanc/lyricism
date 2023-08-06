@@ -10,7 +10,7 @@ namespace lyricism
 {
     public static class ExtensionMethods
     {
-        public static string GetPageSource(this HttpClient httpClient, string url, Dictionary<string, string>? postData = null)
+        public static string GetPageSource(this HttpClient httpClient, string url, Dictionary<string, string> postData = null, Program.PostDataType postDataType = Program.PostDataType.Json)
         {
             if (postData == null)
             {
@@ -19,9 +19,14 @@ namespace lyricism
             }
             else
             {
-                //var content = new FormUrlEncodedContent(postData.ToArray());
+               HttpContent httpContent = null;
+               if (postDataType == Program.PostDataType.Json)
+               {
                 string requestJson = JsonConvert.SerializeObject(postData);
-                HttpContent httpContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
+                httpContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
+               }
+                else if (postDataType == Program.PostDataType.Form)
+               httpContent = new FormUrlEncodedContent(postData);
 
                 using (var result = httpClient.PostAsync(url, httpContent).Result)
                     return result.Content.ReadAsStringAsync().Result;
@@ -34,19 +39,30 @@ namespace lyricism
         }
         public static string[] RegexMatches(this string source, string regex, string? groupName = null)
         {
-            if (source == null) return new string[]{};
+            var matchesGroups = source.RegexMatchesGroups(regex);
+
+            if (!matchesGroups.Any())
+                return new string[]{};
+
+            if (groupName == null)
+                return matchesGroups.Select(g => g[0].Value).ToArray();
+
+            return matchesGroups.Select(g => g[groupName].Value).ToArray();
+
+        }
+        public static List<System.Text.RegularExpressions.GroupCollection>  RegexMatchesGroups(this string source, string regex)
+        {
+            if (source == null) return new (); // List<RegularExpressions.GroupCollection>();
 
             var options = RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.IgnoreCase;
 
             var matches = new Regex(regex, options).Matches(source);
 
             if (!matches.Any())
-                return new string[]{};
+                return new (); //List<RegularExpressions.GroupCollection>();
 
-            if (groupName == null)
-                return matches.Select(m => m.Value).ToArray();
 
-            return matches.Select(m => m.Groups[groupName].Value).ToArray();
+            return matches.Select(m => m.Groups).ToList();
 
         }
         public static string StripHTML(this string input)
@@ -77,6 +93,23 @@ namespace lyricism
         public static string Join(this IEnumerable<char> value)
         {
             return string.Join(string.Empty, value.ToArray());
+        }
+        public static string Sanitize(this string value)
+        {
+            var invalidChars = System.IO.Path.GetInvalidFileNameChars();
+            var output = value.Where(c => !invalidChars.Contains(c)).Join();
+            return output;
+        }
+        // bad form, but enables convenient chaining
+        public static string[] GetDirectories(this string value)
+        {
+            var output = System.IO.Directory.GetDirectories(value);
+            return output;
+        }
+        public static string[] GetFiles(this string value)
+        {
+            var output = System.IO.Directory.GetFiles(value);
+            return output;
         }
     }
 }

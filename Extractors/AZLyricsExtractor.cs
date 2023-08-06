@@ -16,7 +16,7 @@ namespace lyricism.Extractors
 
         public AZLyricsExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
         {
-            this.Active = false;
+            this.Order = 20;
             this.SourceName = "AZLyrics";
         }
         public override void GetLyrics()

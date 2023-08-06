@@ -17,6 +17,7 @@ namespace lyricism.Extractors
 
         public MetallumExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
         {
+            this.Order = 80;
             this.SourceName = "Encylopaedia Metallum";
         }
 

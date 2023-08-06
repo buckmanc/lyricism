@@ -16,6 +16,7 @@ namespace lyricism.Extractors
 
         public GeniusExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
         {
+            this.Order = 10;
             this.SourceName = "Genius";
         }
         public override void GetLyrics()

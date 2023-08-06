@@ -13,14 +13,13 @@ namespace lyricism.Extractors
     {
         private const string SearchURL = "https://bandcamp.com/api/bcsearch_public_api/1/autocomplete_elastic";
 
-
         public BandcampExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
         {
+            this.Order = 100;
             this.SourceName = "Bandcamp";
         }
         public override void GetLyrics()
         {
-            //var postData = "{\"search_text\":\"r\",\"search_filter\":\"\",\"full_page\":false,\"fan_id\":null}";
             var postData = new Dictionary<string, string>();
             postData.Add("search_text", this.SearchArtistName + " " + this.SearchTrackName);
             postData.Add("full_page", "false");
