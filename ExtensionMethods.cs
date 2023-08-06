@@ -12,10 +12,11 @@ namespace lyricism
     {
         public static string GetPageSource(this HttpClient httpClient, string url, Dictionary<string, string> postData = null, Program.PostDataType postDataType = Program.PostDataType.Json)
         {
+            System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> response;
+
             if (postData == null)
             {
-                using (var result = httpClient.GetAsync(url).Result)
-                    return result.Content.ReadAsStringAsync().Result;
+                response = httpClient.GetAsync(url);
             }
             else
             {
@@ -28,9 +29,22 @@ namespace lyricism
                 else if (postDataType == Program.PostDataType.Form)
                httpContent = new FormUrlEncodedContent(postData);
 
-                using (var result = httpClient.PostAsync(url, httpContent).Result)
-                    return result.Content.ReadAsStringAsync().Result;
+                response = httpClient.PostAsync(url, httpContent);
             }
+
+            var output = string.Empty;
+
+            // handle timeouts gracefully
+            try
+            {
+                output = response.Result.Content.ReadAsStringAsync().Result;
+            }
+            catch (System.Threading.Tasks.TaskCanceledException)
+            {
+                Console.WriteLine("http request timed out");
+            }
+
+            return output;
         }
 
         public static string RegexMatch(this string source, string regex, string? groupName = null)

@@ -20,17 +20,22 @@ namespace lyricism.Extractors
         public override void GetLyrics()
         {
             if (!System.IO.Directory.Exists(Program.CacheDir))
+            {
+                // Console.WriteLine(this.SourceName + " error: path does not exist.");
+                // Console.WriteLine("Program.CacheDir: " + Program.CacheDir);
                 return;
+            }
 
             var matchingPath = Program.CacheDir.GetDirectories()
-                .Where(d => d.Contains(this.SearchArtistName.Sanitize(), StringComparison.InvariantCultureIgnoreCase))
+                .Where(d => d.Sanitize().Contains(this.SearchArtistName.Sanitize(), StringComparison.InvariantCultureIgnoreCase))
                 .SelectMany(d => d.GetDirectories())
-                .Where(d => d.Contains(this.SearchTrackName.Sanitize(), StringComparison.InvariantCultureIgnoreCase))
+                .Where(d => d.Sanitize().Contains(this.SearchTrackName.Sanitize(), StringComparison.InvariantCultureIgnoreCase))
                 .SelectMany(d => d.GetFiles())
                 .FirstOrDefault();
 
             if (String.IsNullOrWhiteSpace(matchingPath))
             {
+                // Console.WriteLine("FileCache error: could not find matching path");
                 CheckedLyrics = true;
                 return;
             }

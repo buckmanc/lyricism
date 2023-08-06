@@ -11,7 +11,7 @@ namespace lyricism
             Form
         }
 
-        internal static string CacheDir;
+        internal static string CacheDir = System.IO.Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache", "lyricism");
         static void Main(string artistName, string trackName, string site, bool noCache, bool clearCache)
         {
             // , string albumName
