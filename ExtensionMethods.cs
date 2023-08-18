@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using SpotifyAPI.Web;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -124,6 +125,28 @@ namespace lyricism
         {
             var output = System.IO.Directory.GetFiles(value);
             return output;
+        }
+
+        // the source of these two objects is identical, aside from the names
+        // cloning allows for auto refresh
+        public static AuthorizationCodeTokenResponse CloneToTokenResponse(this AuthorizationCodeRefreshResponse value)
+        {
+            var output = new AuthorizationCodeTokenResponse()
+            {
+                AccessToken = value.AccessToken,
+                TokenType = value.TokenType,
+                ExpiresIn = value.ExpiresIn,
+                Scope = value.Scope,
+                RefreshToken = value.RefreshToken,
+                CreatedAt = value.CreatedAt
+            };
+
+            return output;
+        }
+
+        public static string Repeat(this string value, int n)
+        {
+            return string.Join(string.Empty, Enumerable.Repeat(value, n));
         }
     }
 }
