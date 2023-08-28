@@ -13,7 +13,7 @@ namespace lyricism.Extractors
     {
         private const string SearchURL = "https://bandcamp.com/api/bcsearch_public_api/1/autocomplete_elastic";
 
-        public BandcampExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
+        public BandcampExtractor(string artistName, string trackName) : base(artistName, trackName)
         {
             this.Order = 100;
             this.SourceName = "Bandcamp";
@@ -54,7 +54,7 @@ namespace lyricism.Extractors
 
                 ArtistName = item.band_name;
                 TrackName = item.name;
-                Lyrics = lyrics.StripHTML().Trim();
+                Lyrics = lyrics;
 
                 break;
             }

@@ -15,7 +15,7 @@ namespace lyricism.Extractors
         private const string LyricsURL = "https://www.metal-archives.com/release/ajax-view-lyrics/id/";
 
 
-        public MetallumExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
+        public MetallumExtractor(string artistName, string trackName) : base(artistName, trackName)
         {
             this.Order = 80;
             this.SourceName = "Encylopaedia Metallum";
@@ -23,7 +23,10 @@ namespace lyricism.Extractors
 
         public override void GetLyrics()
         {
-            var search = HttpClient.GetPageSource(SearchURL + "bandName=" + SearchArtistName + "&songTitle=" + SearchTrackName);
+            var search = HttpClient.GetPageSource(SearchURL
+                + "bandName=" + System.Web.HttpUtility.UrlEncode(SearchArtistName)
+                + "&songTitle=" + System.Web.HttpUtility.UrlEncode(SearchTrackName)
+                );
             var parsedJson = JObject.Parse(search);
             if (!parsedJson.TryGetValue("aaData", out var aaData))
             {
@@ -42,7 +45,7 @@ namespace lyricism.Extractors
 
                 ArtistName = item[0].RegexMatch(@"title=.+>(?<name>.*)<", "name");
                 TrackName = item[3];
-                Lyrics = lyrics.StripHTML().Trim();
+                Lyrics = lyrics;
 
                 break;
             }

@@ -11,8 +11,13 @@ namespace lyricism
 {
     public static class ExtensionMethods
     {
+        private const string timeoutErrorMessage = "http request timed out";
         public static string GetPageSource(this HttpClient httpClient, string url, Dictionary<string, string> postData = null, Program.PostDataType postDataType = Program.PostDataType.Json)
         {
+            var httpLoggins = httpClient as LoggingHttpClient;
+            if (httpLoggins != null)
+                httpLoggins.DebugLog.Add(url);
+
             System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> response;
 
             if (postData == null)
@@ -21,14 +26,14 @@ namespace lyricism
             }
             else
             {
-               HttpContent httpContent = null;
-               if (postDataType == Program.PostDataType.Json)
-               {
-                string requestJson = JsonConvert.SerializeObject(postData);
-                httpContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
-               }
+                HttpContent httpContent = null;
+                if (postDataType == Program.PostDataType.Json)
+                {
+                    string requestJson = JsonConvert.SerializeObject(postData);
+                    httpContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
+                }
                 else if (postDataType == Program.PostDataType.Form)
-               httpContent = new FormUrlEncodedContent(postData);
+                    httpContent = new FormUrlEncodedContent(postData);
 
                 response = httpClient.PostAsync(url, httpContent);
             }
@@ -42,7 +47,17 @@ namespace lyricism
             }
             catch (System.Threading.Tasks.TaskCanceledException)
             {
-                Console.WriteLine("http request timed out");
+                if (httpLoggins != null)
+                    httpLoggins.DebugLog.Add(timeoutErrorMessage);
+                else
+                    Console.WriteLine(timeoutErrorMessage);
+            }
+            catch (System.AggregateException ex) when (ex.InnerException is System.Threading.Tasks.TaskCanceledException)
+            {
+                if (httpLoggins != null)
+                    httpLoggins.DebugLog.Add(timeoutErrorMessage);
+                else
+                    Console.WriteLine(timeoutErrorMessage);
             }
 
             return output;
@@ -147,6 +162,84 @@ namespace lyricism
         public static string Repeat(this string value, int n)
         {
             return string.Join(string.Empty, Enumerable.Repeat(value, n));
+        }
+
+        // https://stackoverflow.com/a/3165188
+        public static bool In<T>(this T item, params T[] items)
+        {
+            if (items == null)
+                throw new ArgumentNullException("items");
+
+            return items.Contains(item);
+        }
+
+        /// <summary>
+        /// Removes the specified string from the beginning of a string.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="trimString"></param>
+        /// <param name="comparisonType"></param>
+        /// <returns></returns>
+        public static string TrimStart(this string value, string trimString = " ", StringComparison comparisonType = StringComparison.InvariantCultureIgnoreCase)
+        {
+            if (string.IsNullOrEmpty(value) || string.IsNullOrEmpty(trimString)) return value;
+
+            while (value.StartsWith(trimString, comparisonType))
+            {
+                value = value.Substring(trimString.Length);
+            }
+
+            return value;
+
+        }
+
+        /// <summary>
+        /// Removes the specified string from the beginning of a string.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="trimString"></param>
+        /// <param name="comparisonType"></param>
+        /// <returns></returns>
+        public static string TrimEnd(this string value, string trimString = " ", StringComparison comparisonType = StringComparison.InvariantCultureIgnoreCase)
+        {
+            if (string.IsNullOrEmpty(value) || string.IsNullOrEmpty(trimString)) return value;
+
+            while (value.EndsWith(trimString, comparisonType))
+            {
+                value = value.Substring(0, value.Length - trimString.Length);
+            }
+
+            return value;
+
+        }
+        public static string Trim(this string value, string trimString = " ", StringComparison comparisonType = StringComparison.InvariantCultureIgnoreCase)
+        {
+
+            value = value.TrimStart(trimString, comparisonType);
+            value = value.TrimEnd(trimString, comparisonType);
+
+            return value;
+        }
+
+        public static string StandardizeSpaces(this string value)
+        {
+            if (value == null)
+                return value;
+            var weirdSpaces = new string[] { "\u200B", "\u202F", "\u00A0" };
+            var output = value.Replace(weirdSpaces, " ");
+            return output;
+        }
+        public static string Replace(this string value, IEnumerable<string> oldStrings, string newString)
+        {
+            if (string.IsNullOrEmpty(value))
+                return value;
+
+            foreach (var oldString in oldStrings)
+            {
+                value = value.Replace(oldString, newString);
+            }
+
+            return value;
         }
     }
 }

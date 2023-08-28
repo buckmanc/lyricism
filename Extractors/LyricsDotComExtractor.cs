@@ -14,10 +14,10 @@ namespace lyricism.Extractors
         private const string SearchURL = "https://www.lyrics.com/gw.php";
 
 
-        public LyricsDotComExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
+        public LyricsDotComExtractor(string artistName, string trackName) : base(artistName, trackName)
         {
             this.Order = 30;
-            this.SourceName = "LyricsDotCom";
+            this.SourceName = "Lyrics.Com";
         }
         public override void GetLyrics()
         {
@@ -73,7 +73,7 @@ namespace lyricism.Extractors
 
                     ArtistName = jsonToken["value"].ToString();
                     TrackName = trackLink.TrackName;
-                    Lyrics = lyrics.StripHTML().Trim();
+                    Lyrics = lyrics;
 
                     break;
                 }

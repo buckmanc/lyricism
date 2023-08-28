@@ -11,7 +11,7 @@ namespace lyricism.Extractors
 {
     public class FileCacheExtractor : LyricExtractor
     {
-        public FileCacheExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
+        public FileCacheExtractor(string artistName, string trackName) : base(artistName, trackName)
         {
             this.Order = 0;
             this.IsCache = true;
@@ -19,14 +19,12 @@ namespace lyricism.Extractors
         }
         public override void GetLyrics()
         {
-            if (!System.IO.Directory.Exists(Program.CacheDir))
+            if (!System.IO.Directory.Exists(Program.LyricsCacheDir))
             {
-                // Console.WriteLine(this.SourceName + " error: path does not exist.");
-                // Console.WriteLine("Program.CacheDir: " + Program.CacheDir);
                 return;
             }
 
-            var matchingPath = Program.CacheDir.GetDirectories()
+            var matchingPath = Program.LyricsCacheDir.GetDirectories()
                 .Where(d => d.Sanitize().Contains(this.SearchArtistName.Sanitize(), StringComparison.InvariantCultureIgnoreCase))
                 .SelectMany(d => d.GetDirectories())
                 .Where(d => d.Sanitize().Contains(this.SearchTrackName.Sanitize(), StringComparison.InvariantCultureIgnoreCase))

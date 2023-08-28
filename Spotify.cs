@@ -183,36 +183,50 @@ namespace lyricism
         public static CurrentlyPlayingDeets GetCurrentlyPlayingDeets()
         {
 
-            var playableItem = Spotify.Client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest(PlayerCurrentlyPlayingRequest.AdditionalTypes.All))
-                .Result?.Item;
+            var currentlyPlaying = Spotify.Client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest(PlayerCurrentlyPlayingRequest.AdditionalTypes.All)).Result;
+            var playableItem = currentlyPlaying?.Item;
 
-            var episode = playableItem as FullEpisode;
-            var track = playableItem as FullTrack;
+            var episode = currentlyPlaying?.Item as FullEpisode;
+            var track = currentlyPlaying?.Item as FullTrack;
+            CurrentlyPlayingDeets output = null;
 
             if (track != null)
             {
-                var output = new CurrentlyPlayingDeets()
+                output = new CurrentlyPlayingDeets()
                 {
                     IsEpisode = false,
                     ArtistName = track.Artists.First().Name, // the first artist is always the primary
-                    TrackName = track.Name
+                    TrackName = track.Name,
+                    ProgressMs = currentlyPlaying.ProgressMs ?? 0,
+                    DurationMs = track.DurationMs,
                 };
-                return output;
-
             }
             else if (episode != null)
             {
-                var output = new CurrentlyPlayingDeets()
+                output = new CurrentlyPlayingDeets()
                 {
                     IsEpisode = true,
                     ArtistName = episode.Show.Name,
-                    TrackName = episode.Name
+                    TrackName = episode.Name,
+                    ProgressMs = currentlyPlaying.ProgressMs ?? 0,
+                    DurationMs = episode.DurationMs,
+                    // TODO display description instead of lyrics for podcasts
+                    PodcastDescription = episode.Description,
+                    // Errors = "Cannot retrive lyrics for a podcast."
                 };
-                return output;
+                // TODO theoretically if this were a music podcast
+                // track details *could* be discerned by parsing the show notes and looking at the track progress
+                // not sure the juice is worth the squeeze, as it were
             }
             else
-                return null;
+            {
+                output = new CurrentlyPlayingDeets()
+                {
+                    Errors = "Spotify isn't playing."
+                };
+            }
 
+            return output;
         }
     }
 }

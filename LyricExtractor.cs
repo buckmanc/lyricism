@@ -22,6 +22,9 @@ namespace lyricism
             }
             set
             {
+                if (value != null)
+                    value = value.StripHTML().StandardizeSpaces().Trim();
+
                 _Lyrics = value;
             }
         }
@@ -35,6 +38,9 @@ namespace lyricism
             }
             set
             {
+                if (value != null)
+                    value = value.StandardizeSpaces().Trim();
+
                 _ArtistName = value;
             }
         }
@@ -48,20 +54,10 @@ namespace lyricism
             }
             set
             {
+                if (value != null)
+                    value = value.StandardizeSpaces().Trim();
+
                 _TrackName = value;
-            }
-        }
-        private string _AlbumName;
-        public string AlbumName 
-        { 
-            get
-            {
-                if (!CheckedLyrics) GetLyrics();
-                return _AlbumName;
-            }
-            set
-            {
-                _AlbumName = value;
             }
         }
 
@@ -70,27 +66,32 @@ namespace lyricism
         public bool IsCache = false;
         public string SearchArtistName { get; set; }
         public string SearchTrackName { get; set; }
-        public string SearchAlbumName { get; set; }
 
-        private Lazy<HttpClient> _httpClient = new Lazy<HttpClient>(() => {
-            var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0");
-            // httpClient.DefaultRequestHeaders.Add("referer", "google.com");
-            httpClient.Timeout = TimeSpan.FromSeconds(10);
-            return httpClient;
-            });
-        public HttpClient HttpClient 
+        // public List<string> DebugLog { get; set; } = new();
+        public List<string> DebugLog = new();
+
+
+        private Lazy<LoggingHttpClient> _httpClient;
+        public LoggingHttpClient HttpClient 
         { 
             get
             {
                 return _httpClient.Value;
             }
         }
-        public LyricExtractor(string artistName, string trackName, string? albumName = null)
+        public LyricExtractor(string artistName, string trackName)
         {
             this.SearchArtistName = artistName;
             this.SearchTrackName = trackName;
-            this.SearchAlbumName = albumName;
+            this._httpClient = new Lazy<LoggingHttpClient>(() =>
+            {
+                var httpClient = new LoggingHttpClient(ref this.DebugLog);
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0");
+                // httpClient.DefaultRequestHeaders.Add("referer", "google.com");
+                httpClient.Timeout = TimeSpan.FromSeconds(10);
+                return httpClient;
+            });
+
         }
 
         public abstract void GetLyrics();
@@ -102,7 +103,7 @@ namespace lyricism
             var artistName = this.ArtistName.Sanitize();
             var trackName = this.TrackName.Sanitize();
             var sourceName = this.SourceName.Sanitize();
-            var cachePath = System.IO.Path.Join(Program.CacheDir,artistName, trackName, sourceName + ".txt");
+            var cachePath = System.IO.Path.Join(Program.LyricsCacheDir,artistName, trackName, sourceName + ".txt");
             var cacheDir = System.IO.Path.GetDirectoryName(cachePath);
             if (!System.IO.Directory.Exists(cacheDir))
                 System.IO.Directory.CreateDirectory(cacheDir);

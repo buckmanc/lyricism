@@ -14,15 +14,14 @@ namespace lyricism.Extractors
         private const string SearchURL = "https://genius.com/api/search/multi?q=";
 
 
-        public GeniusExtractor(string artistName, string trackName, string? albumName = null) : base(artistName, trackName, albumName)
+        public GeniusExtractor(string artistName, string trackName) : base(artistName, trackName)
         {
             this.Order = 10;
             this.SourceName = "Genius";
         }
         public override void GetLyrics()
         {
-            // TODO should probably URL encode get parameters
-            var url = SearchURL + (this.SearchArtistName + " " + this.SearchTrackName).Replace(" ", "+");
+            var url = SearchURL + System.Web.HttpUtility.UrlEncode(this.SearchArtistName + " " + this.SearchTrackName);
 
             var search = HttpClient.GetPageSource(url);
             var parsedJson = JObject.Parse(search);
@@ -42,16 +41,27 @@ namespace lyricism.Extractors
                     .Join(Environment.NewLine)
                     .Replace("<br/>", Environment.NewLine)
                     ;
+                // HtmlDecode to string to handle escape sequences
                 lyrics = System.Web.HttpUtility.HtmlDecode(lyrics);
-                // deserialize directly to string to handle escape sequences
-                // lyrics = JsonConvert.DeserializeObject<string>(lyrics);
-                // lyrics = Regex.Unescape(lyrics);
                 if (lyrics == null || lyrics.Contains("(lyrics not available)"))
                     continue;
 
+                lyrics = lyrics.StripHTML().Trim();
+
+                // genius is inserting the cyrillic ye into otherwise duplicate lines
+                var yeTest = lyrics.RegexMatches(@"\p{IsCyrillic}").SelectMany(s => s).ToArray();
+                if (yeTest.Any() && yeTest.Distinct().Count() == 1)
+                {
+                    if (yeTest.First() == 'е')
+                    lyrics = lyrics.Replace('е', 'e');
+                    else
+                        this.DebugLog.Add("Solitary Cyrillic character detected: " + yeTest.First());
+                }
+
+
                 ArtistName = jsonToken["artist_names"].ToString();
                 TrackName = jsonToken["title"].ToString();
-                Lyrics = lyrics.StripHTML().Trim();
+                Lyrics = lyrics;
 
                 break;
             }
