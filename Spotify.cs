@@ -17,82 +17,87 @@ namespace lyricism
         private static string CodeReceived;
         private static string ErrorReceived;
 
-        internal static void SpotifyAuth()
+        internal static void AddSpotifyAccount()
         {
             var tokens = SpotifyTokens.Deserialize() ?? new SpotifyTokens();
 
             // TODO test if they're valid? ask if the user wants to update them if they exist?
 
-            if (string.IsNullOrWhiteSpace(tokens.ClientID))
+            var token = new SpotifyToken();
+            token.ClientID = tokens.Select(t => t.ClientID).FirstOrDefault();
+            token.ClientSecret = tokens.Select(t => t.ClientSecret).FirstOrDefault();
+
+            List<string> ips = new List<string>();
+
+            System.Net.IPHostEntry entry = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+
+            foreach (System.Net.IPAddress ip in entry.AddressList)
+                if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    ips.Add(ip.ToString());
+            ips = ips.OrderByDescending(x => x.Split(".").First()).ToList();
+            var targetIP = ips.FirstOrDefault() ?? "localhost";
+            var port = 5543;
+            var callbackURL = "http://" + targetIP + ":" + port.ToString("####") + "/callback";
+
+            //Console.WriteLine("machine IPs: " + ips.Join(", "));
+            var staticIPWarning = string.Empty;
+            if (targetIP != "localhost")
+                staticIPWarning = " Unless you have a static IP set up for this machine, be aware that this URL could change in the future.";
+
+            if (string.IsNullOrWhiteSpace(token.ClientID) || string.IsNullOrWhiteSpace(token.ClientID))
             {
-                List<string> ips = new List<string>();
-
-                System.Net.IPHostEntry entry = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-
-                foreach (System.Net.IPAddress ip in entry.AddressList)
-                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                        ips.Add(ip.ToString());
-                ips = ips.OrderByDescending(x => x.Split(".").First()).ToList();
-                var targetIP = ips.FirstOrDefault() ?? "localhost";
-                var port = 5543;
-                var callbackURL = "http://" + targetIP + ":" + port.ToString("####") + "/callback";
-
-                //Console.WriteLine("machine IPs: " + ips.Join(", "));
-                var staticIPWarning = string.Empty;
-                if (targetIP != "localhost")
-                    staticIPWarning = " Unless you have a static IP set up for this machine, be aware that this URL could change in the future.";
-
-                Console.WriteLine("If you don't have Spotify developer tokens already please go to https://developer.spotify.com/dashboard/create and create them. Be sure to use a callback address of " + callbackURL + "." + staticIPWarning);
+                Console.WriteLine("If you don't have Spotify developer token already please go to https://developer.spotify.com/dashboard/create and create them. Be sure to use a callback address of " + callbackURL + "." + staticIPWarning);
                 Console.WriteLine();
                 Console.WriteLine("Please enter your Spotify Developer Client ID:");
-                tokens.ClientID = Console.ReadLine();
+                token.ClientID = Console.ReadLine();
                 Console.WriteLine("Please enter your Spotify Developer Client Secret:");
-                tokens.ClientSecret = Console.ReadLine();
-
-                // https://johnnycrazy.github.io/SpotifyAPI-NET/docs/authorization_code/
-
-                _server = new EmbedIOAuthServer(new Uri(callbackURL), port);
-                _server.Start().Wait();
-
-                _server.AuthorizationCodeReceived += OnAuthorizationCodeReceived;
-                _server.ErrorReceived += OnErrorReceived;
-
-                var request = new LoginRequest(_server.BaseUri, tokens.ClientID, LoginRequest.ResponseType.Code)
-                {
-                    Scope = new List<string> {
-                      Scopes.UserModifyPlaybackState
-                    , Scopes.UserReadPlaybackState
-                    , Scopes.UserReadCurrentlyPlaying
-                    , Scopes.UserLibraryModify
-                    }
-                };
-
-                var tinyURL = MakeTinyUrl(request.ToUri().ToString());
-                Console.WriteLine("Please login to Spotify and authorize this app here: " + tinyURL);
-
-                // TODO this should really be async stuff
-                while (string.IsNullOrWhiteSpace(CodeReceived) && string.IsNullOrWhiteSpace(ErrorReceived))
-                    System.Threading.Thread.Sleep(1000);
-
-                _server.Stop().Wait();
-
-                if (!string.IsNullOrWhiteSpace(ErrorReceived))
-                {
-                    Console.WriteLine("Error received while authenticating: " + ErrorReceived);
-                    return;
-                }
-
-                var config = SpotifyClientConfig.CreateDefault();
-                var tokenResponse = new OAuthClient(config).RequestToken(
-                  new AuthorizationCodeTokenRequest(
-                    tokens.ClientID, tokens.ClientSecret, CodeReceived, new Uri(callbackURL)
-                  )
-                ).Result;
-
-                tokens.UserRefreshToken = tokenResponse.RefreshToken;
-                tokens.UserAccessToken = tokenResponse.AccessToken;
-                tokens.Serialize();
+                token.ClientSecret = Console.ReadLine();
             }
+
+            // https://johnnycrazy.github.io/SpotifyAPI-NET/docs/authorization_code/
+
+            _server = new EmbedIOAuthServer(new Uri(callbackURL), port);
+            _server.Start().Wait();
+
+            _server.AuthorizationCodeReceived += OnAuthorizationCodeReceived;
+            _server.ErrorReceived += OnErrorReceived;
+
+            var request = new LoginRequest(_server.BaseUri, token.ClientID, LoginRequest.ResponseType.Code)
+            {
+                Scope = new List<string> {
+                    Scopes.UserModifyPlaybackState
+                        , Scopes.UserReadPlaybackState
+                        , Scopes.UserReadCurrentlyPlaying
+                        , Scopes.UserLibraryModify
+                }
+            };
+
+            var tinyURL = MakeTinyUrl(request.ToUri().ToString());
+            Console.WriteLine("Please login to Spotify and authorize this app here: " + tinyURL);
+
+            // TODO this should really be async stuff
+            while (string.IsNullOrWhiteSpace(CodeReceived) && string.IsNullOrWhiteSpace(ErrorReceived))
+                System.Threading.Thread.Sleep(1000);
+
+            _server.Stop().Wait();
+
+            if (!string.IsNullOrWhiteSpace(ErrorReceived))
+            {
+                Console.WriteLine("Error received while authenticating: " + ErrorReceived);
+                return;
+            }
+
+            var config = SpotifyClientConfig.CreateDefault();
+            var tokenResponse = new OAuthClient(config).RequestToken(
+                    new AuthorizationCodeTokenRequest(
+                        token.ClientID, token.ClientSecret, CodeReceived, new Uri(callbackURL)
+                        )
+                    ).Result;
+
+            token.UserRefreshToken = tokenResponse.RefreshToken;
+            token.UserAccessToken = tokenResponse.AccessToken;
+            tokens.Add(token);
+            tokens.Serialize();
 
         }
 
@@ -140,54 +145,69 @@ namespace lyricism
             }
         }
 
-        private static SpotifyClient _Client;
+        private static List<Lazy<SpotifyClient>> _Clients;
 
-        public static SpotifyClient Client
+        public static List<Lazy<SpotifyClient>> Clients
         {
             get 
             {
-                _Client ??= GetClient();
-                return _Client;
+                _Clients ??= GetClients();
+                return _Clients;
             }
         }
 
-
-        private static SpotifyClient GetClient()
+        // private static int i = 0;
+        private static List<Lazy<SpotifyClient>> GetClients()
         {
             var tokens = SpotifyTokens.Deserialize();
 
-            if (tokens == null)
+            if (tokens == null || !tokens.Any())
                 return null;
+            
+            var outClients = new List<Lazy<SpotifyClient>>();
 
-            var response = new OAuthClient().RequestToken(
-                  new AuthorizationCodeRefreshRequest(
-                      tokens.ClientID,
-                      tokens.ClientSecret,
-                      tokens.UserRefreshToken
-                      )
-                ).Result.CloneToTokenResponse();
+            foreach(var token in tokens)
+            {
+                var outClient = new Lazy<SpotifyClient>(() =>
+                {
+                // i+=1;
+                // Console.WriteLine("lazy client get: " + i.ToString());
+
+                    var response = new OAuthClient().RequestToken(
+                          new AuthorizationCodeRefreshRequest(
+                              token.ClientID,
+                              token.ClientSecret,
+                              token.UserRefreshToken
+                              )
+                        ).Result.CloneToTokenResponse();
 
 
-            tokens.UserAccessToken = response.AccessToken;
+                    token.UserAccessToken = response.AccessToken;
 
-            var config = SpotifyClientConfig
-              .CreateDefault()
-              // according to documentation this should allow for auto token refresh
-              .WithAuthenticator(new AuthorizationCodeAuthenticator(tokens.ClientID, tokens.ClientSecret, response))
-              //.WithToken(tokens.UserAccessToken)
-              ;
+                    var config = SpotifyClientConfig
+                      .CreateDefault()
+                      // according to documentation this should allow for auto token refresh
+                      .WithAuthenticator(new AuthorizationCodeAuthenticator(token.ClientID, token.ClientSecret, response))
+                      //.WithToken(token.UserAccessToken)
+                      ;
 
-            return new SpotifyClient(config);
+                    return new SpotifyClient(config);
+                });
+                outClients.Add(outClient);
+            }
+            return outClients;
         }
 
         public static CurrentlyPlayingDeets GetCurrentlyPlayingDeets()
         {
 
-            var currentlyPlaying = Spotify.Client.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest(PlayerCurrentlyPlayingRequest.AdditionalTypes.All)).Result;
+            var currentlyPlaying = Spotify.Clients
+                .Select(client => client.Value.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest(PlayerCurrentlyPlayingRequest.AdditionalTypes.All)).Result)
+                .FirstOrDefault(playing => playing?.IsPlaying ?? false);
             var playableItem = currentlyPlaying?.Item;
 
-            var episode = currentlyPlaying?.Item as FullEpisode;
-            var track = currentlyPlaying?.Item as FullTrack;
+            var episode = playableItem as FullEpisode;
+            var track = playableItem as FullTrack;
             CurrentlyPlayingDeets output = null;
 
             if (track != null)

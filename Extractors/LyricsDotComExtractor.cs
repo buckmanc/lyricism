@@ -17,7 +17,7 @@ namespace lyricism.Extractors
         public LyricsDotComExtractor(string artistName, string trackName) : base(artistName, trackName)
         {
             this.Order = 30;
-            this.SourceName = "Lyrics.Com";
+            this.SourceName = "Lyrics.com";
         }
         public override void GetLyrics()
         {

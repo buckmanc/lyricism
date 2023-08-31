@@ -6,12 +6,16 @@ using System.Threading.Tasks;
 
 namespace lyricism.Models
 {
-    internal class SpotifyTokens
+    internal class SpotifyToken
     {
         public string? ClientID { get; set; }
         public string? ClientSecret { get; set; }
         public string? UserAccessToken { get; set; }
         public string? UserRefreshToken { get; set; }
+    }
+
+    internal class SpotifyTokens : List<SpotifyToken>
+    {
 
         public void Serialize()
         {

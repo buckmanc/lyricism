@@ -26,18 +26,18 @@ namespace lyricism
         /// <param name="site"></param>
         /// <param name="noCache"></param>
         /// <param name="clearCache"></param>
-        /// <param name="spotifyAuth"></param>
+        /// <param name="addSpotifyAccount"></param>
         /// <param name="watchSpotify"></param>
         public static void Main(string artistName, string trackName, string site, bool noCache, bool clearCache, bool listSites,
                 bool verbose,
-                bool spotifyAuth, bool watchSpotify)
+                bool addSpotifyAccount, bool watchSpotify)
         {
             //if (Debugger.IsAttached)
             //    watchSpotify = true;
 
-            if (spotifyAuth)
+            if (addSpotifyAccount)
             {
-                Spotify.SpotifyAuth();
+                Spotify.AddSpotifyAccount();
                 return;
             }
 
@@ -95,8 +95,8 @@ namespace lyricism
                 var blurbx = FormatLyricReport(blurb);
                 // hacky but efficient
                 if (!blurbx.StartsWith("\r"))
-                    blurbx += "\n"; // TODO how does this look on windows?
-                Console.Write(blurbx.ReplaceLineEndings());
+                    blurbx = (blurbx + "\n").ReplaceLineEndings(); // TODO how does this look on windows?
+                Console.Write(blurbx);
             }
         }
 
@@ -157,18 +157,24 @@ namespace lyricism
             }
 
             if (verbose)
-                yield return "-".Repeat(30);
+                yield return LineyBoi();
 
-            yield return ex.ArtistName + " - " + ex.TrackName;
+            var trackDeets = ex.ArtistName + " - "+ ex.TrackName;
+            if (trackDeets.Length > Console.WindowWidth)
+                trackDeets = ex.ArtistName + "\n" + ex.TrackName;
+            yield return trackDeets;
+
+            yield return string.Empty;
             if (!ex.IsCache)
-                yield return "    " + ex.SourceName;
+                yield return LineyBoi(ex.SourceName);
             else
-                yield return "    " + ex.SubSourceName + " (cached)";
+                yield return LineyBoi(ex.SubSourceName + " (cached)");
 
+            yield return string.Empty;
             // skip lyrics and print a summary of lyrics for verbose here instead?
 
-            yield return "-".Repeat(30);
             yield return ex.Lyrics;
+            yield return LineyBoi();
 
             ex.Cache();
         }
@@ -238,6 +244,23 @@ namespace lyricism
             }
 
             var output = lines.Join("\n");
+            return output;
+        }
+        private const int LineLength = 30;
+        private static string LineyBoi( string label = null)
+        {
+            return LineyBoi(LineLength, label);
+        }
+        private static string LineyBoi(int len, string label = null)
+        {
+            label ??= string.Empty;
+            var sideLen = (len - label.Length) / 2;
+            var output = "-".Repeat(sideLen) + label.Replace(" ", "-") + "-".Repeat(sideLen);
+
+            // mainly for odd label lengths
+            var diff = len - output.Length;
+            output += "-".Repeat(diff);
+
             return output;
         }
     }

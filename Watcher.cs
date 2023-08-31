@@ -108,11 +108,11 @@ namespace lyricism
 
                 if (keyInfo.Value.Key == ConsoleKey.Home
                         || (keyInfo.Value.Key == ConsoleKey.UpArrow &&
-                                    keyInfo.Value.Modifiers == ConsoleModifiers.Control))
+                            keyInfo.Value.Modifiers == ConsoleModifiers.Control))
                     updatedScrollOffset = 0;
                 else if (keyInfo.Value.Key == ConsoleKey.End
                         || (keyInfo.Value.Key == ConsoleKey.DownArrow &&
-                                    keyInfo.Value.Modifiers == ConsoleModifiers.Control))
+                            keyInfo.Value.Modifiers == ConsoleModifiers.Control))
                     updatedScrollOffset = int.MaxValue;
                 else if (keyInfo.Value.Key == ConsoleKey.UpArrow)
                     updatedScrollOffset -= 1;
@@ -149,10 +149,13 @@ namespace lyricism
             do
             {
                 // check for the song to updated periodically
+                // wait a bit before updating the screen for errors
+                // sometimes spotify reports that it isn't playing when it is
+                // this way, time will pass after pausing where it sits on the last lyric displayed
                 while (
-                        (CurrentTrack?.CompareID ?? string.Empty) == (checkTrack?.CompareID ?? string.Empty) 
                         // (CurrentTrack?.CompareID ?? string.Empty) == (checkTrack?.CompareID ?? string.Empty) 
-                        // || (!string.IsNullOrWhiteSpace(checkTrack.Errors) && ErrorTimer.Elapsed.TotalSeconds < 45)
+                        (CurrentTrack?.CompareID ?? string.Empty) == (checkTrack?.CompareID ?? string.Empty) 
+                        || (!string.IsNullOrWhiteSpace(Watcher.Lyrics) &&  checkTrack.IsError && ErrorTimer.Elapsed.TotalSeconds < 45)
                         )
                 {
                     // wait longer the longer the spotify isn't playing or some other error occurs
@@ -173,11 +176,10 @@ namespace lyricism
                     // TODO pass in track progress percent?
                     AutoScroll(checkTrack.ProgressMs, checkTrack.DurationMs);
 
-                    if ((checkTrack?.IsError ?? true) && ErrorTimer.IsRunning)
+                    if (!(checkTrack?.IsError ?? true) && ErrorTimer.IsRunning)
                         ErrorTimer.Reset();
                     else if ((checkTrack?.IsError ?? true) && !ErrorTimer.IsRunning)
                         ErrorTimer.Start();
-                            
                 }
 
                 CurrentTrack = checkTrack;
@@ -187,17 +189,9 @@ namespace lyricism
 
                 if (CurrentTrack?.IsError ?? true)
                 {
-                    // wait a bit before updating the screen for errors
-                    // sometimes spotify reports that it isn't playing when it is
-                    // this way, time will pass after pausing where it sits on the last lyric displayed
-                    if (ErrorTimer.Elapsed.TotalSeconds > 45)
-                        continue;
-                    else
-                    {
-                        Lyrics += CurrentTrack?.Errors ?? "Erroneous Spotify state.";
-                        UpdateScreen();
-                        continue;
-                    }
+                    Lyrics += CurrentTrack?.Errors ?? "Erroneous Spotify state.";
+                    UpdateScreen();
+                    continue;
                 }
 
                 foreach (var blurb in CurrentTrack.PodcastDescriptionArray ?? Program.GetLyricReport(CurrentTrack.ArtistName, CurrentTrack.TrackName, site, noCache, verbose))

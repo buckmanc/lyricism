@@ -15,7 +15,8 @@ Lyricism searches multiple sites for lyrics. So far it supports:
 
 - Genius
 - AZLyrics
-- LyricsDotCom
+- Lyrics.com
+- Letras.com
 - Encylopaedia Metallum
 - Bandcamp
 
