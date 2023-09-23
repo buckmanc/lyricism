@@ -84,10 +84,10 @@ namespace lyricism
             Console.Clear();
             Console.Write(output);
         }
-        internal static void Watch(string site, bool noCache, bool verbose)
+        internal static void Watch(string site, bool noCache, bool verbose, bool translate, string translateLang)
         {
             // spin off threads to watch for updates
-            var watchSpot = Task.Run(() => WatchSpotify(site, noCache, verbose));
+            var watchSpot = Task.Run(() => WatchSpotify(site, noCache, verbose, translate, translateLang));
             var watchScreen = Task.Run(() => WatchScreen());
             var watchKey = Task.Run(() => WatchKeyboard());
 
@@ -141,7 +141,7 @@ namespace lyricism
                     );
         }
 
-        private static void WatchSpotify(string site, bool noCache, bool verbose)
+        private static void WatchSpotify(string site, bool noCache, bool verbose, bool translate, string translateLang)
         {
             var checkTrack = Spotify.GetCurrentlyPlayingDeets();
 
@@ -194,11 +194,11 @@ namespace lyricism
                     continue;
                 }
 
-                foreach (var blurb in CurrentTrack.PodcastDescriptionArray ?? Program.GetLyricReport(CurrentTrack.ArtistName, CurrentTrack.TrackName, site, noCache, verbose))
+                foreach (var blurb in CurrentTrack.PodcastDescriptionArray ?? Program.GetLyricReport(CurrentTrack.ArtistName, CurrentTrack.TrackName, site, noCache, verbose, translate, translateLang))
                 {
                     var blurbx = blurb;
                     // hacky but efficient
-                    if (!blurbx.StartsWith("\r"))
+                    if (!blurbx.StartsWith("\r") && !blurbx.EndsWith("\r"))
                         blurbx += "\n"; 
                     Lyrics += blurbx;
                     UpdateScreen();

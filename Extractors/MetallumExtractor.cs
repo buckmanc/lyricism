@@ -24,12 +24,13 @@ namespace lyricism.Extractors
         public override void GetLyrics()
         {
             var search = HttpClient.GetPageSource(SearchURL
-                + "bandName=" + System.Web.HttpUtility.UrlEncode(SearchArtistName)
-                + "&songTitle=" + System.Web.HttpUtility.UrlEncode(SearchTrackName)
+                + "bandName=" + SearchArtistName.UrlEncode()
+                + "&songTitle=" + SearchTrackName.UrlEncode()
                 );
             var parsedJson = JObject.Parse(search);
             if (!parsedJson.TryGetValue("aaData", out var aaData))
             {
+                this.DebugLog.Add("No search results.");
                 this.CheckedLyrics = true;
                 return;
             }
@@ -38,13 +39,25 @@ namespace lyricism.Extractors
 
             foreach (var item in items)
             {
-                var lyricID = item[4].RegexMatch(@"id=.+[a-z]+.(?<id>\d+)", "id");
-                var lyrics = HttpClient.GetPageSource(LyricsURL + lyricID);
-                if (lyrics.Contains("(lyrics not available)"))
+                var artistName = item[0].RegexMatch(@"title=.+>(?<name>.*)<", "name");
+                var trackName = item[3];
+
+                this.DebugLog.Add("Artist: " + artistName);
+                this.DebugLog.Add("Track: " + trackName);
+
+                if (!artistName.SearchTermMatch(this.SearchArtistName) || !trackName.SearchTermMatch(this.SearchTrackName))
                     continue;
 
-                ArtistName = item[0].RegexMatch(@"title=.+>(?<name>.*)<", "name");
-                TrackName = item[3];
+                var lyricID = item[4].RegexMatch(@"id=.+[a-z]+.(?<id>\d+)", "id");
+                var lyrics = HttpClient.GetPageSource(LyricsURL + lyricID);
+                if (lyrics.IsNullOrWhiteSpace() || lyrics.ContainsAny(LyricErrors))
+                {
+                    this.DebugLog.Add("No lyrics found.");
+                    continue;
+                }
+
+                ArtistName = artistName;
+                TrackName = trackName;
                 Lyrics = lyrics;
 
                 break;

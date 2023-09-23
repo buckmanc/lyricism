@@ -1,1 +1,0 @@
-(cd lyricismTests/ && dotnet test)

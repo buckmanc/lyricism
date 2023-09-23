@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -21,29 +22,43 @@ namespace lyricism.Extractors
         {
             if (!System.IO.Directory.Exists(Program.LyricsCacheDir))
             {
+                this.DebugLog.Add("Cache folder is missing.");
                 return;
             }
 
-            var matchingPath = Program.LyricsCacheDir.GetDirectories()
-                .Where(d => d.Sanitize().Contains(this.SearchArtistName.Sanitize(), StringComparison.InvariantCultureIgnoreCase))
+            var matchingPaths = Program.LyricsCacheDir.GetDirectories()
+                .Where(d => d.Sanitize().SearchTermMatch(this.SearchArtistName.Sanitize()))
                 .SelectMany(d => d.GetDirectories())
-                .Where(d => d.Sanitize().Contains(this.SearchTrackName.Sanitize(), StringComparison.InvariantCultureIgnoreCase))
+                .Where(d => d.Sanitize().SearchTermMatch(this.SearchTrackName.Sanitize()))
                 .SelectMany(d => d.GetFiles())
-                .FirstOrDefault();
+                .ToArray();
 
-            if (String.IsNullOrWhiteSpace(matchingPath))
+            if (!matchingPaths.Any())
             {
-                // Console.WriteLine("FileCache error: could not find matching path");
+                this.DebugLog.Add("No match found.");
                 CheckedLyrics = true;
                 return;
             }
 
-            var pathElements = matchingPath.Split(System.IO.Path.DirectorySeparatorChar).Reverse().ToArray();
+            foreach (var path in matchingPaths)
+            {
+                var lyrics = System.IO.File.ReadAllText(path);
 
-            SubSourceName = System.IO.Path.GetFileNameWithoutExtension(pathElements[0]);
-            TrackName = pathElements[1];
-            ArtistName = pathElements[2];
-            Lyrics = System.IO.File.ReadAllText(matchingPath);
+                if (lyrics == null || lyrics.ContainsAny(LyricErrors))
+                {
+                    this.DebugLog.Add("No lyrics found.");
+                    continue;
+                }
+
+                var pathElements = path.Split(System.IO.Path.DirectorySeparatorChar).Reverse().ToArray();
+
+                SubSourceName = System.IO.Path.GetFileNameWithoutExtension(pathElements[0]);
+                TrackName = pathElements[1];
+                ArtistName = pathElements[2];
+                Lyrics = lyrics;
+                break;
+            }
+
             CheckedLyrics = true;
         }
     }

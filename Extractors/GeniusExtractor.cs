@@ -21,30 +21,44 @@ namespace lyricism.Extractors
         }
         public override void GetLyrics()
         {
-            var url = SearchURL + System.Web.HttpUtility.UrlEncode(this.SearchArtistName + " " + this.SearchTrackName);
+            var url = SearchURL + (this.SearchArtistName + " " + this.SearchTrackName).UrlEncode();
 
             var search = HttpClient.GetPageSource(url);
             var parsedJson = JObject.Parse(search);
             IEnumerable<JToken> jsonTokens = parsedJson.SelectTokens("response.sections[?(@.type == 'song')].hits[*].result");
             if (jsonTokens == null)
             {
+                this.DebugLog.Add("No search results.");
                 this.CheckedLyrics = true;
                 return;
             }
 
             foreach (var jsonToken in jsonTokens)
             {
+                var artistName = jsonToken["artist_names"].ToString();
+                var trackName = jsonToken["title"].ToString();
+
+                this.DebugLog.Add("Artist: " + artistName);
+                this.DebugLog.Add("Track: " + trackName);
+
+                if (!artistName.SearchTermMatch(this.SearchArtistName) || !trackName.SearchTermMatch(this.SearchTrackName))
+                    continue;
+
                 var lyricsURL = "https://genius.com" + jsonToken["path"];
                 var lyrics = HttpClient.GetPageSource(lyricsURL);
                 lyrics = lyrics
                     .RegexMatches(@"data-lyrics-container.+?>(?<value>.+?)</div>", "value")
-                    .Join(Environment.NewLine)
-                    .Replace("<br/>", Environment.NewLine)
+                    .Join("\n")
+                    .Replace("<br/>", "\n")
                     ;
+
                 // HtmlDecode to string to handle escape sequences
                 lyrics = System.Web.HttpUtility.HtmlDecode(lyrics);
-                if (lyrics == null || lyrics.Contains("(lyrics not available)"))
+                if (lyrics.IsNullOrWhiteSpace() || lyrics.ContainsAny(LyricErrors))
+                {
+                    this.DebugLog.Add("No lyrics found.");
                     continue;
+                }
 
                 lyrics = lyrics.StripHTML().Trim();
 
@@ -59,8 +73,8 @@ namespace lyricism.Extractors
                 }
 
 
-                ArtistName = jsonToken["artist_names"].ToString();
-                TrackName = jsonToken["title"].ToString();
+                ArtistName = artistName;
+                TrackName = trackName;
                 Lyrics = lyrics;
 
                 break;

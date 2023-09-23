@@ -18,6 +18,7 @@ namespace lyricism.Extractors
             this.Order = 100;
             this.SourceName = "Bandcamp";
         }
+
         public override void GetLyrics()
         {
             var postData = new Dictionary<string, string>();
@@ -32,6 +33,7 @@ namespace lyricism.Extractors
             var jsonToken = parsedJson.SelectToken("auto.results");
             if (jsonToken == null)
             {
+                this.DebugLog.Add("No search results.");
                 this.CheckedLyrics = true;
                 return;
             }
@@ -41,6 +43,15 @@ namespace lyricism.Extractors
             foreach (var item in items)
             {
                 var lyricsURL = (string)item.item_url_path;
+                var artistName = (string)item.band_name;
+                var trackName = (string)item.name;
+
+                this.DebugLog.Add("Artist: " + artistName);
+                this.DebugLog.Add("Track: " + trackName);
+
+                if (!artistName.SearchTermMatch(this.SearchArtistName) || !trackName.SearchTermMatch(this.SearchTrackName))
+                    continue;
+
                 // Console.WriteLine(lyricsURL);
                 var lyrics = HttpClient.GetPageSource(lyricsURL);
                 // lyrics = lyrics.RegexMatch(@"\"lyrics\":{.+text\":\"(?<value>.+)\"}}", "value");
@@ -49,11 +60,15 @@ namespace lyricism.Extractors
                 // lyrics = JsonConvert.DeserializeObject<string>(lyrics);
                 if (lyrics != null)
                     lyrics = Regex.Unescape(lyrics);
-                if (lyrics == null || lyrics.Contains("(lyrics not available)"))
-                    continue;
 
-                ArtistName = item.band_name;
-                TrackName = item.name;
+                if (lyrics.IsNullOrWhiteSpace() || lyrics.ContainsAny(LyricErrors))
+                {
+                    this.DebugLog.Add("No lyrics found.");
+                    continue;
+                }
+
+                ArtistName = artistName;
+                TrackName = trackName;
                 Lyrics = lyrics;
 
                 break;

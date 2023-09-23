@@ -33,6 +33,7 @@ namespace lyricism.Extractors
                 ?.ToArray();
             if (jsonTokens == null)
             {
+                this.DebugLog.Add("No search results.");
                 this.CheckedLyrics = true;
                 return;
             }
@@ -41,37 +42,48 @@ namespace lyricism.Extractors
 
             foreach (var jsonToken in jsonTokens)
             {
-                if (jsonToken["category"].ToString() != "Artists")
+                var artistName = jsonToken["value"].ToString();
+                this.DebugLog.Add("Artist: " + artistName);
+
+                if (jsonToken["category"].ToString() != "Artists" || !artistName.SearchTermMatch(SearchArtistName))
                     continue;
 
                 var artistURL = Regex.Unescape(jsonToken["link"].ToString());
                 var artistPageSource = HttpClient.GetPageSource(artistURL);
                 var trackLinks = artistPageSource.RegexMatchesGroups(@"""tal qx"".+?href=""(?<url>.+?)"">(?<trackName>.+?)<")
-                    .Select(g => new {URL = "https://www.lyrics.com" +  g["url"].Value, TrackName = g["trackName"].Value})
-                    .Where(x => x.TrackName.Contains(SearchTrackName, StringComparison.InvariantCultureIgnoreCase)) // TODO standardize this better
+                    .Select(g => new {
+                        URL = "https://www.lyrics.com" +  g["url"].Value,
+                        TrackName = g["trackName"].Value,
+                    })
+                    .Where(x => x.TrackName.SearchTermMatch(SearchTrackName))
                     .ToArray();
 
                 if (!trackLinks.Any())
                 {
+                    this.DebugLog.Add("No tracks found.");
                     continue;
                 }
 
                 foreach (var trackLink in trackLinks)
                 {
-                    // Console.WriteLine("trackLink.URL: " + trackLink.URL);
+                    this.DebugLog.Add("Track: " + trackLink.TrackName);
+
                     var trackPageSource = HttpClient.GetPageSource(trackLink.URL);
                     // lyric-body
                     var lyrics = trackPageSource
                         .RegexMatches(@"""lyric-body"".+?>(?<value>.+?)</pre>", "value")
-                        .Join(Environment.NewLine)
-                        .Replace("<br/>", Environment.NewLine)
+                        .Join("\n")
+                        .Replace("<br/>", "\n")
                         .Trim()
                         ;
                     // lyrics = System.Web.HttpUtility.HtmlDecode(lyrics);
-                    if (lyrics == null || lyrics.Contains("(lyrics not available)"))
+                    if (lyrics.IsNullOrWhiteSpace() || lyrics.ContainsAny(LyricErrors))
+                    {
+                        this.DebugLog.Add("No lyrics found.");
                         continue;
+                    }
 
-                    ArtistName = jsonToken["value"].ToString();
+                    ArtistName = artistName;
                     TrackName = trackLink.TrackName;
                     Lyrics = lyrics;
 

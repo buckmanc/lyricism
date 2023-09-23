@@ -11,6 +11,24 @@ namespace lyricism
         public string SourceName { get; set; } = "abstract class";
         public string SubSourceName { get; set; }
         public int Order { get; set; } = 0;
+        internal string[] LyricErrors = new string[]
+        {
+            "lyrics not available", 
+            "sometimes the lyrics are just not submitted to us yet",
+            "sometimes the lyrics are just not submited to us yet", //sic
+        };
+        public bool IsInstrumental()
+        {
+            return IsInstrumental(this.Lyrics);
+        }
+
+        private static string[] instrumentalIndicators = new string[] {"inst", "instrumental"};
+        private static bool IsInstrumental(string value)
+        {
+            var comparisonText = value.AlphanumericOnly().ToLower();
+
+            return instrumentalIndicators.Contains(comparisonText);
+        }
 
         private string _Lyrics;
         public string Lyrics 
@@ -24,6 +42,9 @@ namespace lyricism
             {
                 if (value != null)
                     value = value.StripHTML().StandardizeSpaces().Trim();
+
+                if (IsInstrumental(value))
+                    value = "Instrumental";
 
                 _Lyrics = value;
             }
@@ -109,6 +130,47 @@ namespace lyricism
                 System.IO.Directory.CreateDirectory(cacheDir);
 
             System.IO.File.WriteAllText(cachePath, this.Lyrics);
+        }
+
+        private Dictionary<string, string> translations = new(); 
+        public string GetTranslation(string languageCode)
+        {
+            if (this.translations.TryGetValue(languageCode, out var transLyrics))
+                return transLyrics;
+
+            if (string.IsNullOrWhiteSpace(this.Lyrics))
+                return this.Lyrics;
+
+            System.Diagnostics.Process p = System.Diagnostics.Process.Start("trans", "- brief -no-ansi -target " + languageCode + " -- \"" + Lyrics + "\"");
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.CreateNoWindow = true;
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
+
+            p.Start();
+
+            string output = p.StandardOutput.ReadToEnd();
+            string error = p.StandardError.ReadToEnd();
+
+            p.WaitForExit();
+
+            // TODO what error code indicates failure?
+            int exitCode = p.ExitCode;
+
+            if (true)
+            {
+                this.translations.Add(languageCode, output);
+
+                Console.WriteLine(output);
+                Environment.Exit(10);
+
+                return output;
+            }
+            else
+            {
+                this.translations.Add(languageCode, null);
+                return null;
+            }
         }
     }
 }

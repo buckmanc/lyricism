@@ -19,7 +19,16 @@ namespace lyricism
         internal static string NoLyricsLogPath = System.IO.Path.Join(CacheDir, "nolyrics.log");
 
         internal const string ansiEmphasis = "\x1B[1;31m";
+        internal const string ansiDim= "\x1B[35m";
         internal const string ansiReset = "\x1B[0m";
+
+        public static bool TinyMode
+        {
+            get
+            {
+                return Console.WindowWidth <= 40;
+            }
+        }
 
         /// <param name="artistName"></param>
         /// <param name="trackName"></param>
@@ -30,11 +39,10 @@ namespace lyricism
         /// <param name="watchSpotify"></param>
         public static void Main(string artistName, string trackName, string site, bool noCache, bool clearCache, bool listSites,
                 bool verbose,
-                bool addSpotifyAccount, bool watchSpotify)
+                bool addSpotifyAccount, bool watchSpotify,
+                bool translate, string translateLang = "en-us"
+                )
         {
-            //if (Debugger.IsAttached)
-            //    watchSpotify = true;
-
             if (addSpotifyAccount)
             {
                 Spotify.AddSpotifyAccount();
@@ -54,7 +62,7 @@ namespace lyricism
 
             if (watchSpotify)
             {
-                Watcher.Watch(site, noCache, verbose);
+                Watcher.Watch(site, noCache, verbose, translate, translateLang);
                 return;
             }
 
@@ -90,12 +98,12 @@ namespace lyricism
             }
 
             // TODO restructure this to handle podcast description prettier, with better formatting
-            foreach (var blurb in podcastDescriptionArray ?? GetLyricReport(artistName, trackName, site, noCache, verbose))
+            foreach (var blurb in podcastDescriptionArray ?? GetLyricReport(artistName, trackName, site, noCache, verbose, translate, translateLang))
             {
                 var blurbx = FormatLyricReport(blurb);
                 // hacky but efficient
-                if (!blurbx.StartsWith("\r"))
-                    blurbx = (blurbx + "\n").ReplaceLineEndings(); // TODO how does this look on windows?
+                if (!blurbx.StartsWith("\r") && !blurbx.EndsWith("\r"))
+                    blurbx = (blurbx + "\n").ReplaceLineEndings();
                 Console.Write(blurbx);
             }
         }
@@ -108,8 +116,8 @@ namespace lyricism
                   .Cast<LyricExtractor>()
                   .Where(x => x != null)
                   .Where(x => 1 == 2
-                              || (!string.IsNullOrWhiteSpace(site) && x.SourceName.Contains(site, StringComparison.InvariantCultureIgnoreCase))
-                              || (string.IsNullOrWhiteSpace(site) && x.Active)
+                              || (!site.IsNullOrWhiteSpace() && x.SourceName.SearchTermMatch(site))
+                              || (site.IsNullOrWhiteSpace() && x.Active)
                               )
                   .Where(x => !noCache || !x.IsCache)
                   .OrderBy(x => x.Order)
@@ -118,7 +126,7 @@ namespace lyricism
             return extractors;
         }
 
-        internal static IEnumerable<string> GetLyricReport(string artistName, string trackName, string site, bool noCache, bool verbose)
+        public static IEnumerable<string> GetLyricReport(string artistName, string trackName, string site, bool noCache, bool verbose, bool translate, string translateLang)
         {
             var extractors = GetExtractors(artistName, trackName, site, noCache);
 
@@ -156,6 +164,9 @@ namespace lyricism
                 yield break;
             }
 
+            var outputLyrics = ex.Lyrics;
+
+
             if (verbose)
                 yield return LineyBoi();
 
@@ -173,8 +184,16 @@ namespace lyricism
             yield return string.Empty;
             // skip lyrics and print a summary of lyrics for verbose here instead?
 
-            yield return ex.Lyrics;
-            yield return LineyBoi();
+            var indent = string.Empty;
+            if (ex.IsInstrumental())
+                indent = " ".Repeat((Console.WindowWidth - ex.Lyrics.Length) / 2);
+
+            if (translate) // && string.IsNullOrWhiteSpace(ex.Translation)) // would have to determine language too
+                yield return ex.GetTranslation(translateLang);
+            else
+                yield return indent + ex.Lyrics;
+
+            yield return "\n" + LineyBoi() + "\r";
 
             ex.Cache();
         }
@@ -235,7 +254,6 @@ namespace lyricism
                        if (!firstChunkEnd.EndsWith(ansiReset))
                            lines[firstChunkEndPos] = firstChunkEnd + ansiReset;
 
-
                        // if a chunk is removed, stay put for the next loop
                        firstChunkPos -= 1;
                     }
@@ -243,13 +261,35 @@ namespace lyricism
                 }
             }
 
+            var labelRegex = @"^[\[\(\}](instrumental|outro)?( | / )?(pre-|post-)?(chorus|verse|bridge|hook|intro|outro|break|breakdown|build|section|sung|spoken|refrain|drop|gibberish|solo \w+?|\w+? solo)( \d| x\d)?(: .+?)?[\]\)\}]$";
+
+            // TODO these labels wrap for small screens
+            // ex: --artist-name 'bridge sinner' --track-name 'devil like you'
+            var labelMatches = lines
+                .Distinct()
+                .Select(line => line.RegexMatch(labelRegex))
+                .Distinct()
+                .ToArray();
+
+                if (labelMatches.Any())
+                    lines = lines.Select(line => labelMatches.Contains(line)
+                            ? ansiDim + line + ansiReset
+                            : line).ToList();
+            
             var output = lines.Join("\n");
             return output;
         }
         private const int LineLength = 30;
-        private static string LineyBoi( string label = null)
+        private static string LineyBoi(string label = null)
         {
-            return LineyBoi(LineLength, label);
+            if (TinyMode)
+            {
+                var border = 2;
+                var output = " ".Repeat(border / 2) + LineyBoi(Console.WindowWidth - border, label);
+                return output;
+            }
+            else
+                return LineyBoi(LineLength, label);
         }
         private static string LineyBoi(int len, string label = null)
         {

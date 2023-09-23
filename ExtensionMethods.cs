@@ -2,7 +2,9 @@
 using SpotifyAPI.Web;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -80,21 +82,28 @@ namespace lyricism
             return matchesGroups.Select(g => g[groupName].Value).ToArray();
 
         }
+
+        private static RegexOptions regexOptions = RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.IgnoreCase;
         public static List<System.Text.RegularExpressions.GroupCollection>  RegexMatchesGroups(this string source, string regex)
         {
-            if (source == null) return new (); // List<RegularExpressions.GroupCollection>();
+            if (source == null) return new ();
 
-            var options = RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.IgnoreCase;
-
-            var matches = new Regex(regex, options).Matches(source);
+            var matches = new Regex(regex, regexOptions).Matches(source);
 
             if (!matches.Any())
-                return new (); //List<RegularExpressions.GroupCollection>();
-
+                return new ();
 
             return matches.Select(m => m.Groups).ToList();
 
         }
+
+        public static string RegexReplace(this string source, string regex, string replacement)
+        {
+            if (source.IsNullOrWhiteSpace()) return source;
+
+            return new Regex(regex, regexOptions).Replace(source, replacement);
+        }
+
         public static string StripHTML(this string input)
         {
             return Regex.Replace(input, "<.*?>", String.Empty);
@@ -240,6 +249,126 @@ namespace lyricism
             }
 
             return value;
+        }
+        public static bool ContainsAny(this string value, IEnumerable<string> searchy, StringComparison sc = StringComparison.InvariantCultureIgnoreCase)
+        {
+            return searchy.Any(x => value.Contains(x, sc));
+        }
+
+        public static bool IsNullOrWhiteSpace(this string value)
+        {
+            return string.IsNullOrWhiteSpace(value);
+        }
+
+        private static char[] _wildcards = new char[] { '*', '?' };
+        public static string AlphanumericOnly(this string value, bool preserveWildcards = false)
+        {
+            return value.Where(c =>
+                char.IsLetterOrDigit(c) ||
+                (preserveWildcards && _wildcards.Contains(c))
+            ).Join();
+        }
+
+        public static string RemoveAccents(this string text)
+        {
+            StringBuilder sbReturn = new StringBuilder();
+            var arrayText = text.Normalize(NormalizationForm.FormD).ToCharArray();
+            foreach (char letter in arrayText)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(letter) != UnicodeCategory.NonSpacingMark)
+                    sbReturn.Append(letter);
+            }
+            return sbReturn.ToString();
+        }
+
+        public static string Standardize(this string value)
+        {
+            return value
+                .Replace(" ", " ") // replace nbsp with regular space
+                .Replace("​", "")   // replace whatever the hell this is with a space
+                .Trim()
+                .TrimStart("the ")
+                .Replace(" & ", " and ")
+                .RemoveAccents()
+                .AlphanumericOnly(preserveWildcards: true)
+                .ToLower()
+                ;
+        }
+        
+        //https://www.dotnetperls.com/levenshtein
+        public static int LevenshteinDistance(this string s, string t)
+        {
+            s = s.Standardize();
+            t = t.Standardize();
+
+            int n = s.Length;
+            int m = t.Length;
+            int[,] d = new int[n + 1, m + 1];
+
+            // Verify arguments.
+            if (n == 0)
+            {
+                return m;
+            }
+
+            if (m == 0)
+            {
+                return n;
+            }
+
+            // Initialize arrays.
+            for (int i = 0; i <= n; d[i, 0] = i++)
+            {
+            }
+
+            for (int j = 0; j <= m; d[0, j] = j++)
+            {
+            }
+
+            // Begin looping.
+            for (int i = 1; i <= n; i++)
+            {
+                for (int j = 1; j <= m; j++)
+                {
+                    // Compute cost.
+                    int cost = (t[j - 1] == s[i - 1]) ? 0 : 1;
+                    d[i, j] = Math.Min(
+                    Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                    d[i - 1, j - 1] + cost);
+                }
+            }
+            // Return cost.
+            return d[n, m];
+        }
+
+        public static double LevenshteinPercentChange(this string s, string t)
+        {
+            var dist = s.LevenshteinDistance(t);
+            var perc = dist * 1.0 / Math.Max(s.Length, t.Length);
+            return perc;
+        }
+
+        public static bool SearchTermMatch(this string value, string searchTerm)
+        {
+            var valueStan = value.Standardize();
+            var searchTermStan = searchTerm.Standardize();
+
+            return 1 == 2
+                || valueStan.Contains(searchTermStan)
+                || searchTermStan.Contains(valueStan)
+                || valueStan.LevenshteinPercentChange(searchTermStan) <= 0.25
+                ;
+
+        }
+
+        public static string UrlEncode(this string value)
+        {
+            return System.Web.HttpUtility.UrlEncode(value);
+        }
+
+        public static string HtmlDecode(this string value)
+        {
+            return System.Web.HttpUtility.HtmlDecode(value);
         }
     }
 }
